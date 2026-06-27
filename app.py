@@ -11,13 +11,15 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
 if not api_key:
-    st.error("❌ GEMINI_API_KEY not found in .env or Streamlit secrets")
+    st.error("❌ GEMINI_API_KEY not found in .env or Streamlit Secrets")
     st.stop()
 
 genai.configure(api_key=api_key)
 
-model = genai.GenerativeModel("gemini-1.5-flash")
+# ✅ STABLE MODEL (FIXED)
+model = genai.GenerativeModel("gemini-pro")
 
+# ---------------- PROMPTS ----------------
 SYSTEM_PROMPT = """
 You are a professional smartphone market research interviewer.
 
@@ -40,7 +42,7 @@ Extract:
 Return structured bullet points clearly.
 """
 
-# ---------------- TEXT TO SPEECH (FIXED) ----------------
+# ---------------- TEXT TO SPEECH ----------------
 def speak(text):
     try:
         tts = gTTS(text=text, lang="en")
@@ -52,8 +54,8 @@ def speak(text):
 
         st.audio(audio_bytes, format="audio/mp3")
 
-    except Exception:
-        st.warning("🔊 Voice unavailable (text only mode)")
+    except:
+        st.warning("🔊 Voice not available")
 
 # ---------------- UI ----------------
 st.set_page_config(page_title="AI Interview Agent", layout="centered")
@@ -71,11 +73,11 @@ st.markdown("""
     color:white;
     margin-bottom:15px;
 ">
-👋 Welcome! This AI conducts smartphone consumer interviews and generates insights.
+👋 Welcome! This AI conducts smartphone consumer interviews and generates insights automatically.
 </div>
 """, unsafe_allow_html=True)
 
-# ---------------- SESSION INIT ----------------
+# ---------------- SESSION STATE ----------------
 if "chat" not in st.session_state:
     st.session_state.chat = model.start_chat(history=[])
 
@@ -90,7 +92,7 @@ if not st.session_state.started:
     if st.button("🚀 Start Interview"):
         st.session_state.started = True
 
-        greeting = "Hi, I'm your AI interview assistant. Let's begin the interview."
+        greeting = "Hi 👋 I'm your AI interview assistant. Let's start the interview."
 
         st.session_state.messages.append(
             {"role": "assistant", "content": greeting}
@@ -100,7 +102,7 @@ if not st.session_state.started:
 
     st.stop()
 
-# ---------------- CHAT DISPLAY ----------------
+# ---------------- CHAT HISTORY ----------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
@@ -122,22 +124,23 @@ if prompt:
             [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
         )
 
-        try:
-            with st.spinner("Generating insights report... 📊"):
-                result = model.generate_content(
+        with st.spinner("Generating insights report... 📊"):
+            try:
+                result = st.session_state.chat.send_message(
                     INSIGHT_PROMPT + "\n\nConversation:\n" + full_chat
                 )
+
                 report = result.text
 
-            st.success("Report Generated Successfully ✅")
-            st.markdown("## 📊 Market Intelligence Report")
-            st.write(report)
+                st.success("Report Generated Successfully ✅")
+                st.markdown("## 📊 Market Intelligence Report")
+                st.write(report)
 
-            speak("Here is your consumer insights report.")
+                speak("Here is your consumer insights report.")
 
-        except Exception as e:
-            st.error("⚠️ Failed to generate report")
-            st.write(str(e))
+            except Exception as e:
+                st.error("⚠️ Failed to generate report")
+                st.write(str(e))
 
     # ---------------- NORMAL CHAT ----------------
     else:
@@ -147,11 +150,10 @@ if prompt:
                 with st.spinner("Thinking... 🤖"):
 
                     response = st.session_state.chat.send_message(
-                        prompt + "\nReply in max 5 lines only."
+                        prompt + "\nKeep response short (max 5 lines)"
                     )
 
                     reply = response.text
-
                     st.write(reply)
 
             st.session_state.messages.append(
@@ -161,6 +163,5 @@ if prompt:
             speak(reply[:200])
 
         except Exception as e:
-            error_msg = "⚠️ AI temporarily unavailable. Please try again."
-            st.error(error_msg)
+            st.error("⚠️ AI temporarily unavailable")
             st.write(str(e))
