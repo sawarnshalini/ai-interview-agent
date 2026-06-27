@@ -5,23 +5,17 @@ import os
 from gtts import gTTS
 import tempfile
 
-# ---------------- CONFIG ----------------
-
 load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
 
 if not api_key:
-st.error("❌ GEMINI_API_KEY not found")
+st.error("GEMINI_API_KEY not found")
 st.stop()
 
 genai.configure(api_key=api_key)
 
-# Gemini model
-
 model = genai.GenerativeModel("gemini-2.5-flash")
-
-# ---------------- VOICE FUNCTION ----------------
 
 def speak(text):
 try:
@@ -34,12 +28,9 @@ tts.save(temp_file.name)
         audio = f.read()
 
     st.audio(audio, format="audio/mp3")
-
-except Exception as e:
-    print(e)
+except:
+    pass
 ```
-
-# ---------------- UI ----------------
 
 st.set_page_config(
 page_title="AI Consumer Interview Assistant",
@@ -50,12 +41,10 @@ st.title("🎤 AI Consumer Interview Assistant")
 
 st.markdown("### 👩‍💻 Developed by Shalini Kumari")
 
-st.info(
+st.write(
 "👋 Hi! I'm your AI Interview Assistant. "
 "How can I help you today?"
 )
-
-# ---------------- SESSION ----------------
 
 if "chat" not in st.session_state:
 st.session_state.chat = model.start_chat(history=[])
@@ -63,13 +52,9 @@ st.session_state.chat = model.start_chat(history=[])
 if "messages" not in st.session_state:
 st.session_state.messages = []
 
-# ---------------- SHOW CHAT ----------------
-
 for msg in st.session_state.messages:
 with st.chat_message(msg["role"]):
 st.write(msg["content"])
-
-# ---------------- INPUT ----------------
 
 prompt = st.chat_input("Type your message...")
 
@@ -95,7 +80,6 @@ try:
     with st.chat_message("assistant"):
         st.write(reply)
 
-    # Voice output
     speak(reply[:200])
 
 except Exception as e:
