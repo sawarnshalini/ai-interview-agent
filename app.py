@@ -5,7 +5,7 @@ import os
 from gtts import gTTS
 import tempfile
 
-# Load API key
+# ------------------ CONFIG ------------------
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -16,64 +16,87 @@ You are a professional smartphone market research interviewer.
 
 Rules:
 - Ask one question at a time
-- Ask natural follow-ups
+- Ask natural follow-up questions
 - Understand purchase behavior
 - Understand sentiment
-- Keep conversation human and professional
+- Keep conversation human and conversational
 """
 
 INSIGHT_PROMPT = """
 You are a senior market intelligence analyst.
 
-Extract from conversation:
+Analyze the conversation and extract:
+
 1. Purchase Drivers
-2. Customer Sentiment
+2. Customer Sentiment (Positive / Neutral / Negative)
 3. Product Perception
 4. Key Customer Needs
 5. Marketing Recommendations
 
-Return clean structured bullet points.
+Return structured bullet points in clean format.
 """
 
-# ---------- SPEAK FUNCTION ----------
+# ------------------ TEXT TO SPEECH ------------------
 def speak(text):
-    tts = gTTS(text)
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-    tts.save(temp_file.name)
-    st.audio(temp_file.name, autoplay=True)
+    try:
+        tts = gTTS(text)
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        tts.save(temp_file.name)
+        st.audio(temp_file.name, autoplay=True)
+    except:
+        pass
 
-# ---------- UI ----------
-st.set_page_config(page_title="AI Interview Agent")
-st.title("🎤 AI Consumer Interview Assistant")
+# ------------------ UI HEADER ------------------
+st.set_page_config(page_title="AI Interview Agent", layout="centered")
 
-# ---------- INIT ----------
+st.markdown("""
+# 🎤 AI Consumer Interview Assistant  
+### Built by: **Shalini Sawarn**
+""")
+
+st.markdown("""
+<div style="
+    background-color:#111827;
+    padding:15px;
+    border-radius:10px;
+    color:white;
+    margin-bottom:20px;
+">
+👋 Welcome! This AI conducts smartphone consumer interviews and generates market insights automatically.
+</div>
+""", unsafe_allow_html=True)
+
+# ------------------ SESSION INIT ------------------
 if "chat" not in st.session_state:
     st.session_state.chat = model.start_chat(history=[])
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# ---------- DEFAULT GREETING ----------
 if "started" not in st.session_state:
-    st.session_state.started = True
+    st.session_state.started = False
 
-    greeting = "Hi, I'm your AI interview assistant. How can I help you today?"
+# ------------------ START BUTTON ------------------
+if not st.session_state.started:
+    if st.button("🚀 Start Interview"):
+        st.session_state.started = True
 
-    st.session_state.messages.append(
-        {"role": "assistant", "content": greeting}
-    )
+        greeting = "Hi 👋 I'm your AI interview assistant. Let's begin the consumer interview."
 
-    with st.chat_message("assistant"):
-        st.write(greeting)
+        st.session_state.messages.append(
+            {"role": "assistant", "content": greeting}
+        )
 
-    speak(greeting)
+        st.rerun()
 
-# ---------- SHOW CHAT ----------
+    st.stop()
+
+# ------------------ CHAT DISPLAY ------------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# ---------- INPUT ----------
+# ------------------ USER INPUT ------------------
 prompt = st.chat_input("Type your response...")
 
 if prompt:
@@ -83,40 +106,48 @@ if prompt:
     with st.chat_message("user"):
         st.write(prompt)
 
-    # ---------- EXIT ----------
+    # ---------------- EXIT FLOW ----------------
     if prompt.lower() == "exit":
 
-        try:
-            full_chat = "\n".join(
-                [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
-            )
+        full_chat = "\n".join(
+            [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
+        )
 
-            result = st.session_state.chat.send_message(
-                INSIGHT_PROMPT + "\n\nConversation:\n" + full_chat
-            )
+        with st.spinner("Generating insights report... 📊"):
+            try:
+                result = st.session_state.chat.send_message(
+                    INSIGHT_PROMPT + "\n\nConversation:\n" + full_chat
+                )
 
-            st.subheader("📊 Consumer Insights Report")
-            st.write(result.text)
+                st.success("Report Generated Successfully ✅")
 
-            speak("Here is your consumer insights report. Thank you.")
+                st.markdown("## 📊 Market Intelligence Report")
+                st.write(result.text)
 
-        except Exception as e:
-            st.error("⚠️ API limit reached or error occurred. Try again later.")
+                speak("Here is your consumer insights report.")
 
+            except Exception:
+                st.error("⚠️ Unable to generate report. API limit or error.")
+
+    # ---------------- NORMAL CHAT ----------------
     else:
 
         try:
-            response = st.session_state.chat.send_message(prompt)
-            reply = response.text
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking... 🤖"):
+                    response = st.session_state.chat.send_message(prompt)
+                    reply = response.text
+                    st.write(reply)
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": reply}
+            )
+
+            speak(reply[:200])
 
         except Exception:
-            reply = "⚠️ AI quota reached. Please try again later."
-
-        st.session_state.messages.append(
-            {"role": "assistant", "content": reply}
-        )
-
-        with st.chat_message("assistant"):
-            st.write(reply)
-
-        speak(reply[:200])
+            error_msg = "⚠️ AI service unavailable or quota exceeded."
+            st.session_state.messages.append(
+                {"role": "assistant", "content": error_msg}
+            )
+            st.error(error_msg)
