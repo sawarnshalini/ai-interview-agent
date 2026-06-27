@@ -5,48 +5,48 @@ import os
 from gtts import gTTS
 import tempfile
 
-# ------------------ CONFIG ------------------
+# ---------------- CONFIG ----------------
 load_dotenv()
+
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-model = genai.GenerativeModel("gemini-2.5-flash")
+# ⚡ Faster model (IMPORTANT IMPROVEMENT)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 SYSTEM_PROMPT = """
-You are a professional smartphone market research interviewer.
+You are a fast AI consumer interview assistant.
 
 Rules:
-- Ask one question at a time
-- Ask natural follow-up questions
-- Understand purchase behavior
-- Understand sentiment
-- Keep conversation human and conversational
+- Ask ONE question at a time
+- Keep responses short (max 5-6 lines)
+- Be natural and conversational
+- Focus on smartphone consumer behavior
 """
 
 INSIGHT_PROMPT = """
 You are a senior market intelligence analyst.
 
-Analyze the conversation and extract:
-
+Extract:
 1. Purchase Drivers
-2. Customer Sentiment (Positive / Neutral / Negative)
+2. Customer Sentiment
 3. Product Perception
 4. Key Customer Needs
 5. Marketing Recommendations
 
-Return structured bullet points in clean format.
+Keep output structured and clean.
 """
 
-# ------------------ TEXT TO SPEECH ------------------
+# ---------------- TEXT TO SPEECH ----------------
 def speak(text):
     try:
         tts = gTTS(text)
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
         tts.save(temp_file.name)
-        st.audio(temp_file.name, autoplay=True)
+        st.audio(temp_file.name)
     except:
         pass
 
-# ------------------ UI HEADER ------------------
+# ---------------- UI ----------------
 st.set_page_config(page_title="AI Interview Agent", layout="centered")
 
 st.markdown("""
@@ -60,13 +60,13 @@ st.markdown("""
     padding:15px;
     border-radius:10px;
     color:white;
-    margin-bottom:20px;
+    margin-bottom:15px;
 ">
-👋 Welcome! This AI conducts smartphone consumer interviews and generates market insights automatically.
+👋 Welcome! This AI conducts real-time consumer interviews and generates insights instantly.
 </div>
 """, unsafe_allow_html=True)
 
-# ------------------ SESSION INIT ------------------
+# ---------------- SESSION STATE ----------------
 if "chat" not in st.session_state:
     st.session_state.chat = model.start_chat(history=[])
 
@@ -76,12 +76,12 @@ if "messages" not in st.session_state:
 if "started" not in st.session_state:
     st.session_state.started = False
 
-# ------------------ START BUTTON ------------------
+# ---------------- START BUTTON ----------------
 if not st.session_state.started:
     if st.button("🚀 Start Interview"):
         st.session_state.started = True
 
-        greeting = "Hi 👋 I'm your AI interview assistant. Let's begin the consumer interview."
+        greeting = "Hi 👋 I'm your AI interview assistant. Let's start the interview."
 
         st.session_state.messages.append(
             {"role": "assistant", "content": greeting}
@@ -91,12 +91,12 @@ if not st.session_state.started:
 
     st.stop()
 
-# ------------------ CHAT DISPLAY ------------------
+# ---------------- CHAT HISTORY ----------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# ------------------ USER INPUT ------------------
+# ---------------- USER INPUT ----------------
 prompt = st.chat_input("Type your response...")
 
 if prompt:
@@ -119,15 +119,13 @@ if prompt:
                     INSIGHT_PROMPT + "\n\nConversation:\n" + full_chat
                 )
 
-                st.success("Report Generated Successfully ✅")
+                st.success("Report Generated ✅")
 
                 st.markdown("## 📊 Market Intelligence Report")
                 st.write(result.text)
 
-                speak("Here is your consumer insights report.")
-
             except Exception:
-                st.error("⚠️ Unable to generate report. API limit or error.")
+                st.error("⚠️ Failed to generate report (API limit or error)")
 
     # ---------------- NORMAL CHAT ----------------
     else:
@@ -135,7 +133,9 @@ if prompt:
         try:
             with st.chat_message("assistant"):
                 with st.spinner("Thinking... 🤖"):
-                    response = st.session_state.chat.send_message(prompt)
+                    response = st.session_state.chat.send_message(
+                        prompt + "\n(Keep response short, max 5-6 lines)"
+                    )
                     reply = response.text
                     st.write(reply)
 
@@ -143,10 +143,10 @@ if prompt:
                 {"role": "assistant", "content": reply}
             )
 
-            speak(reply[:200])
+            speak(reply[:150])  # shorter audio = faster UX
 
         except Exception:
-            error_msg = "⚠️ AI service unavailable or quota exceeded."
+            error_msg = "⚠️ AI temporarily unavailable."
             st.session_state.messages.append(
                 {"role": "assistant", "content": error_msg}
             )
