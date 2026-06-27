@@ -107,24 +107,20 @@ if "chat" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
  
-# Kick off the interview immediately with the model's first real question,
-# instead of waiting for the user to say something first (which previously
-# caused Gemini to respond like a generic assistant to "Hi").
+# Kick off the interview with a hardcoded opening question (no API call
+# needed for this, since it's always the same first topic) to conserve
+# free-tier quota.
 if not st.session_state.messages:
-    try:
-        opening_response = st.session_state.chat.send_message(
-            "Begin the interview now. Greet the respondent briefly in one "
-            "sentence, then ask your first question about their smartphone "
-            "usage behavior."
-        )
-        opening_reply = opening_response.text
-        st.session_state.messages.append(
-            {"role": "assistant", "content": opening_reply}
-        )
-    except Exception as e:
-        st.session_state.messages.append(
-            {"role": "assistant", "content": "Hi! Let's get started — could you tell me a bit about how you use your smartphone day to day?"}
-        )
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": (
+                "Hi! Thanks for joining this short interview about your "
+                "smartphone experience. To start, could you tell me a bit "
+                "about how you use your phone day to day?"
+            ),
+        }
+    )
  
 if "interview_finished" not in st.session_state:
     st.session_state.interview_finished = False
@@ -190,8 +186,16 @@ if prompt and not st.session_state.interview_finished:
                 "Generate Report** above to generate the summary and insights."
             )
     except Exception as e:
-        st.error("AI error")
-        st.write(e)
+        if "429" in str(e) or "quota" in str(e).lower() or "ResourceExhausted" in str(e):
+            st.error(
+                "⚠️ Daily AI quota reached (Gemini free tier allows a limited "
+                "number of requests per day). Please try again later, or use "
+                "a different API key. Your conversation so far is still saved "
+                "below — you can resume once the quota resets."
+            )
+        else:
+            st.error("AI error")
+            st.write(e)
  
 # -----------------------------
 # Generate transcript + insights report
@@ -210,8 +214,17 @@ if finish_clicked:
                 )
                 st.session_state.insights_report = analysis_response.text
             except Exception as e:
-                st.error("Could not generate insights report")
-                st.write(e)
+                if "429" in str(e) or "quota" in str(e).lower() or "ResourceExhausted" in str(e):
+                    st.error(
+                        "⚠️ Daily AI quota reached, so the insights report "
+                        "couldn't be generated right now. The transcript "
+                        "below is still available — try generating the "
+                        "report again once the quota resets."
+                    )
+                    st.text(transcript)
+                else:
+                    st.error("Could not generate insights report")
+                    st.write(e)
  
 if st.session_state.insights_report:
     st.markdown("---")
