@@ -1,5 +1,5 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 import os
 from gtts import gTTS
@@ -14,10 +14,10 @@ if not api_key:
     st.error("❌ GEMINI_API_KEY not found in .env or Streamlit Secrets")
     st.stop()
 
-genai.configure(api_key=api_key)
+# ✅ NEW GEMINI CLIENT (IMPORTANT FIX)
+client = genai.Client(api_key=api_key)
 
-# ✅ STABLE MODEL (FIXED)
-model = genai.GenerativeModel("gemini-pro")
+MODEL_NAME = "gemini-1.5-flash"
 
 # ---------------- PROMPTS ----------------
 SYSTEM_PROMPT = """
@@ -78,9 +78,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------- SESSION STATE ----------------
-if "chat" not in st.session_state:
-    st.session_state.chat = model.start_chat(history=[])
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -102,10 +99,18 @@ if not st.session_state.started:
 
     st.stop()
 
-# ---------------- CHAT HISTORY ----------------
+# ---------------- CHAT DISPLAY ----------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
+
+# ---------------- AI CALL FUNCTION ----------------
+def get_ai_response(prompt):
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt
+    )
+    return response.text
 
 # ---------------- USER INPUT ----------------
 prompt = st.chat_input("Type your response...")
@@ -124,13 +129,12 @@ if prompt:
             [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
         )
 
-        with st.spinner("Generating insights report... 📊"):
-            try:
-                result = st.session_state.chat.send_message(
+        try:
+            with st.spinner("Generating insights report... 📊"):
+
+                report = get_ai_response(
                     INSIGHT_PROMPT + "\n\nConversation:\n" + full_chat
                 )
-
-                report = result.text
 
                 st.success("Report Generated Successfully ✅")
                 st.markdown("## 📊 Market Intelligence Report")
@@ -138,9 +142,9 @@ if prompt:
 
                 speak("Here is your consumer insights report.")
 
-            except Exception as e:
-                st.error("⚠️ Failed to generate report")
-                st.write(str(e))
+        except Exception as e:
+            st.error("⚠️ Failed to generate report")
+            st.write(str(e))
 
     # ---------------- NORMAL CHAT ----------------
     else:
@@ -149,11 +153,10 @@ if prompt:
             with st.chat_message("assistant"):
                 with st.spinner("Thinking... 🤖"):
 
-                    response = st.session_state.chat.send_message(
-                        prompt + "\nKeep response short (max 5 lines)"
+                    reply = get_ai_response(
+                        prompt + "\nReply in max 5 lines only."
                     )
 
-                    reply = response.text
                     st.write(reply)
 
             st.session_state.messages.append(
